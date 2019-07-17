@@ -1,0 +1,23 @@
+{
+  "name": "firebase-template",
+  "version": "1.0.0",
+  "description": "Firebase Template",
+  "main": "vue.config.js",
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build-staging": "vue-cli-service build --mode staging"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@vue/cli-service": "^3.8.4",
+    "bootstrap": "^4.3.1",
+    "bootstrap-vue": "^2.0.0-rc.26",
+    "firebase": "^6.2.4",
+    "node-sass": "^4.12.0",
+    "sass-loader": "^7.1.0",
+    "vue": "^2.6.10",
+    "vue-router": "^3.0.6",
+    "vue-template-compiler": "^2.6.10"
+  }
+}

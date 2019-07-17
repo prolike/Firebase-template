@@ -1,0 +1,139 @@
+version: 2
+jobs:
+
+  integrate:
+    docker:
+      - image: circleci/node:8.10
+    steps:
+      - checkout
+      - run:
+          name: Environment
+          command: |
+            git --version
+            env | sort | grep "CIRCLE"
+      - run:
+          name: Intro
+          command: ./play --manuscript .circleci/manuscript.yml --part gitintro
+      - run:
+          name: Swap to target branch and test integration
+          command: ./play --manuscript .circleci/manuscript.yml --part integrate
+
+  unittest:
+    docker:
+      - image: circleci/node:8.10
+    steps:
+      - checkout
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ checksum "./app/package.json" }}
+          # fallback to using the latest cache if no exact match is found
+          - v1-dependencies-
+      - run: npm install --prefix ./app/
+      - save_cache:
+          paths:
+            - ./app/node_modules
+          key: v1-dependencies-{{ checksum "./app/package.json" }}
+
+  end-2-end-test:
+    docker:
+      - image: circleci/node:8.10
+    steps:
+      - checkout
+      - run:
+          name: Swap to target branch and integrate
+          command: ./play --manuscript .circleci/manuscript.yml --part integrate
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ checksum "./app/package.json" }}
+          # fallback to using the latest cache if no exact match is found
+          - v1-dependencies-
+      - run: npm install --prefix ./app/
+      - save_cache:
+          paths:
+            - ./app/node_modules
+          key: v1-dependencies-{{ checksum "./app/package.json" }}
+          
+  deliver:
+    docker:
+      - image: circleci/node:8.10
+    steps:
+      - checkout
+      - run:
+          name: Intro
+          command: ./play --manuscript .circleci/manuscript.yml --part gitintro
+      - run:
+          name: integrate
+          command: ./play --manuscript .circleci/manuscript.yml --part integrate
+      - run:
+          name: Deliver
+          command: ./play --manuscript .circleci/manuscript.yml --part deliver
+
+  stage:
+    docker:
+      - image: circleci/node:8.10
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ checksum "./app/package.json" }}
+          # fallback to using the latest cache if no exact match is found
+          - v1-dependencies-
+      - run: npm install --prefix ./app/
+      - save_cache:
+          paths:
+            - ./app/node_modules
+          key: v1-dependencies-{{ checksum "./app/package.json" }}
+      - run:
+          name: Install Firebase Tools
+          command: sudo npm install --prefix=./firebase-deploy firebase-tools
+      - run:
+          name: Run npm build-staging
+          command: cd app && sudo npm run build-staging
+      - run:
+          name: Set environment type to staging
+          command: sudo ./firebase-deploy/node_modules/.bin/firebase functions:config:set env.type="staging" -P staging --token=$FIREBASE_TOKEN
+      - run:
+          name: Deploy to stage
+          command: sudo ./firebase-deploy/node_modules/.bin/firebase deploy --only hosting -P staging --token=$FIREBASE_TOKEN
+
+workflows:
+  version: 2
+  FirebaseTemplate:
+    jobs:
+      - integrate:
+          filters:
+            branches:
+              only:
+                - /ready\/.+/ 
+      - unittest: 
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only: /.*/
+      - end-2-end-test: 
+          requires:
+            - unittest
+          filters:
+            tags:
+              only: /.*/
+            branches:
+              only: /.*/  
+      - deliver:
+          requires:
+            - unittest
+            - end-2-end-test
+          filters:
+            branches:
+              only:
+                - /ready\/.+/ 
+      - stage: # Staging
+          requires:
+            - unittest
+            - end-2-end-test 
+          filters:
+              branches:
+                only:
+                  - master

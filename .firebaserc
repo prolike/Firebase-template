@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "default": "project-id-stage",
+    "staging": "project-id-stage"
+  }
+}
